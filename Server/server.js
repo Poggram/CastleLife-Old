@@ -39,6 +39,17 @@ io.on("connection", (socket) => {
   var player = new Player({ socket_id: socket.id });
   // player list with socket id equal to player
   player_list[socket.id] = player;
+  // pushh player into init pack
+  InitPack.player.push(player);
+  players = [];
+  // loop through all players
+  for (var i in player_list) {
+    // push player into init pack
+    players.push(player_list[i]);
+  }
+  socket.emit("init", {
+    player: players,
+  });
   console.log("New client connected");
 
   //Socket on disconnect
@@ -47,6 +58,8 @@ io.on("connection", (socket) => {
     delete socket_list[socket.id];
     // remove socket.id from player_list
     delete player_list[socket.id];
+    // add to remove pack
+    RemovePack.player.push(socket.id);
     console.log("Client disconnected");
   });
   //Socket on Direction
@@ -65,10 +78,15 @@ server.listen(port, () => {
   console.log(`Server started on port ${port}`);
 });
 
+// define Initpack
+var InitPack = { player: [] };
+// define RemovePack
+var RemovePack = { player: [] };
+
 //interval to send message to all clients
 setInterval(() => {
   // create variable pack equal to empty pack
-  var pack = [];
+  var pack = { player: [] };
   for (var i in player_list) {
     // create variable socket equal to socket_list[i]
     var player = player_list[i];
@@ -76,18 +94,28 @@ setInterval(() => {
     // update player
     player.update();
 
-    // add socket to pack
-    pack.push({
+    // push data into pack
+    pack.player.push({
+      Id: player.Id,
       x: player.x,
       y: player.y,
     });
   }
 
-  // for each client emit newPositions
+  // for each client
   for (var i in socket_list) {
     // create variable socket equal to socket_list[i]
     var socket = socket_list[i];
-    // emit newPositions to client
-    socket.emit("newPositions", pack);
+    // emit init to client
+    socket.emit("init", InitPack);
+    // emit update to client
+    socket.emit("update", pack);
+    //emit remove to client
+    socket.emit("remove", RemovePack);
   }
+
+  // empty init pack
+  InitPack.player = [];
+  // empty remove pack
+  RemovePack.player = [];
 }, 1000 / 25);
